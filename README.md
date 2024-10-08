@@ -1,4 +1,36 @@
+
+
 # Contact-GraspNet  
+
+## Making it work locally
+I've followed these steps to make the repo work locally:
+```
+cd src/contact_graspnet
+conda env create -f contact_graspnet_env.yml
+conda activate contact_graspnet_env
+```
+
+Test it out:
+```
+python contact_graspnet/inference.py  --np_path=test_data/0.npy  --local_regions --filter_grasps
+```
+
+In case torch modules don't work, try doing the following:
+```
+pip3 uninstall torch torchvision torchaudio
+pip3 install torch torchvision torchaudio
+```
+
+
+If these are not enough, try doing the following:
+```
+sudo mkdir -p /usr/lib/dri
+sudo ln -s /usr/lib/x86_64-linux-gnu/dri/swrast_dri.so /usr/lib/dri/swrast_dri.so
+cd /home/jacinto/miniconda3/envs/contact_graspnet_env/lib
+mv libstdc++.so.6 libstdc++.so.6.bak /usr/lib/x86_64-linux-gnu/libstdc++.so.6
+rm libstdc++.so
+sudo ln -s libstdc++.so.6 libstdc++.so
+```
 
 ### Contact-GraspNet: Efficient 6-DoF Grasp Generation in Cluttered Scenes   
 Martin Sundermeyer, Arsalan Mousavian, Rudolph Triebel, Dieter Fox  

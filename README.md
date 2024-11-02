@@ -4,21 +4,26 @@
 
 ## Making it work locally
 I've followed these steps to make the repo work locally:
-```
-cd src/contact_graspnet
+```bash
 conda env create -f contact_graspnet_env.yml
 conda activate contact_graspnet_env
 ```
 
+Install CUDA 11.8 (Ubuntu 22.04): https://developer.nvidia.com/cuda-11-8-0-download-archive?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=22.04&target_type=deb_local
+
+
 Test it out:
-```
+```bash
 python contact_graspnet/inference.py  --np_path=test_data/0.npy  --local_regions --filter_grasps
 ```
 
 In case torch modules don't work, try doing the following:
-```
+```bash
 pip3 uninstall torch torchvision torchaudio
 pip3 install torch torchvision torchaudio
+```
+```bash
+conda install libgcc libstdcxx-ng
 ```
 
 

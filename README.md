@@ -3,12 +3,14 @@
 # Contact-GraspNet  
 
 ## Making it work locally
+Install CUDA 11.7.
 I've followed these steps to make the repo work locally:
-```
-cd src/contact_graspnet
+``` bash
 conda env create -f contact_graspnet_env.yml
 conda activate contact_graspnet_env
+sh compile_pointnet_tfops.sh
 ```
+
 
 Test it out:
 ```
@@ -23,6 +25,13 @@ pip3 install torch torchvision torchaudio
 
 
 If these are not enough, try doing the following:
+
+```
+conda install libgcc libstdcxx-ng
+conda install -c nvidia cudnn
+conda install -c conda-forge cudnn
+```
+
 ```
 sudo mkdir -p /usr/lib/dri
 sudo ln -s /usr/lib/x86_64-linux-gnu/dri/swrast_dri.so /usr/lib/dri/swrast_dri.so

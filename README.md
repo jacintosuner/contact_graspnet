@@ -13,14 +13,17 @@ sh compile_pointnet_tfops.sh
 
 
 Test it out:
-```
+```bash
 python contact_graspnet/inference.py  --np_path=test_data/0.npy  --local_regions --filter_grasps
 ```
 
 In case torch modules don't work, try doing the following:
-```
+```bash
 pip3 uninstall torch torchvision torchaudio
 pip3 install torch torchvision torchaudio
+```
+```bash
+conda install libgcc libstdcxx-ng
 ```
 
 

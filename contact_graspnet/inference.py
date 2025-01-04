@@ -20,7 +20,8 @@ from data import regularize_pc_point_count, depth2pc, load_available_input_data
 from contact_grasp_estimator import GraspEstimator
 from visualization_utils import visualize_grasps, show_image
 
-def inference(global_config, checkpoint_dir, input_paths, results_path, K=None, local_regions=True, skip_border_objects=False, filter_grasps=True, segmap_id=None, z_range=[0.2,1.8], forward_passes=1):
+def inference(global_config, checkpoint_dir, input_paths, results_path, K=None, local_regions=True, skip_border_objects=False, filter_grasps=True, segmap_id=None, z_range=[0.2,1.8], forward_passes=1, OBJECT_ID = -1):
+    OBJECT_ID = int(OBJECT_ID)
     """
     Predict 6-DoF grasp distribution for given model and input data
     
@@ -78,40 +79,79 @@ def inference(global_config, checkpoint_dir, input_paths, results_path, K=None, 
     for i in range(num_objs):
         pc_segments[i] = initial_pcd[initial_pcd_seg == i]
     
-    print('Generating Grasps...')
-    pred_grasps_cam, scores, contact_pts, _ = grasp_estimator.predict_scene_grasps(sess, 
-                                                                                   pc_full = initial_pcd, 
-                                                                                   pc_segments = pc_segments, 
-                                                                                   local_regions=local_regions, 
-                                                                                   filter_grasps=filter_grasps, 
-                                                                                   forward_passes=forward_passes)
 
-    # print(pred_grasps_cam.keys())
-    # print(scores.shape)
-    # print(contact_pts.shape)  
+    
+    # -- 
+    CAMERA_CALIBRATION_FILE = '../extrinsics.npz'
+    T_cam_to_world = np.load(CAMERA_CALIBRATION_FILE, allow_pickle=True)
+    regenerate = True
+    
+    while regenerate:
 
-    _ = input('Press any key to continue...')
+        print('Generating Grasps...')
+        pred_grasps_cam, scores, contact_pts, _ = grasp_estimator.predict_scene_grasps(sess, 
+                                                                                    pc_full = initial_pcd, 
+                                                                                    pc_segments = pc_segments, 
+                                                                                    local_regions=local_regions, 
+                                                                                    filter_grasps=filter_grasps, 
+                                                                                    forward_passes=forward_passes)
 
-    # Save results
-    if results_path == 'results':
-        np.savez(os.path.join(results_path, 'predictions_{}'.format(os.path.basename(p.replace('png','npz').replace('npy','npz')))), 
-                    pred_grasps_cam=pred_grasps_cam, scores=scores, contact_pts=contact_pts)
-    else:
-        np.savez(os.path.join(results_path, 'contact_graspnet_results'), 
-                    pred_grasps_cam=pred_grasps_cam, scores=scores, contact_pts=contact_pts)
+        # print(pred_grasps_cam.keys())
+        # print(scores.shape)
+        # print(contact_pts.shape)  
 
-    # Visualize results
-    # show_image(rgb, segmap)
-    visualize_grasps(initial_pcd, pred_grasps_cam, scores, plot_opencv_cam=True) #, pc_colors=pc_colors)
-    # Visualize the grasp with the highest score
-    best_grasps = {}
-    best_scores = {}
-    for id, score_list in scores.items():
-        max_score_idx = np.argmax(score_list)
-        best_scores[id] = [score_list[max_score_idx]]
-        best_grasps[id] = [pred_grasps_cam[id][max_score_idx]]
-    visualize_grasps(initial_pcd, best_grasps, best_scores, plot_opencv_cam=True) #, pc_colors=pc_colors, visualize_3D_grasp_axis=True)
+        # _ = input('Press any key to continue...')
+
+        # Save results
+        if results_path == 'results':
+            np.savez(os.path.join(results_path, 'predictions_{}'.format(os.path.basename(p.replace('png','npz').replace('npy','npz')))), 
+                        pred_grasps_cam=pred_grasps_cam, scores=scores, contact_pts=contact_pts)
+        else:
+            np.savez(os.path.join(results_path, 'contact_graspnet_results'), 
+                        pred_grasps_cam=pred_grasps_cam, scores=scores, contact_pts=contact_pts)
+
+        # Visualize results
+        # show_image(rgb, segmap)
+        visualize_grasps(initial_pcd, pred_grasps_cam, scores, plot_opencv_cam=True) #, pc_colors=pc_colors)
+        # Visualize the grasp with the highest score
+        best_grasps = {}
+        best_scores = {}
+
+        # --
+        error_flag = False
+        # --
+        for id, score_list in scores.items():
+            # print("-----------------------------------", id)
+            # max_score_idx = np.argmax(score_list)
+            # best_scores[id] = [score_list[max_score_idx]]
+            # best_grasps[id] = [pred_grasps_cam[id][max_score_idx]]
+            
+            # -- virtual wall in realworld for target object
+            
+            pred_grasps_world = np.matmul(T_cam_to_world["T"], pred_grasps_cam[id])
+
+            SAFE_RANGE = np.where((pred_grasps_world[:, 0, 3] > 0.25) & (pred_grasps_world[:, 0, 3] <= 0.6))
+            score_list = score_list[SAFE_RANGE]
         
+            try:
+                max_score_idx = np.argmax(score_list)
+                best_scores[id] = [score_list[max_score_idx]]
+                best_grasps[id] = [pred_grasps_cam[id][max_score_idx]]
+            except:
+                if id == OBJECT_ID:
+                    error_flag = True
+                    break
+                continue
+            
+        # breakpoint()
+        if error_flag is False:
+            regenerate = False
+
+
+    visualize_grasps(initial_pcd, best_grasps, best_scores, plot_opencv_cam=True) #, pc_colors=pc_colors, visualize_3D_grasp_axis=True)
+
+    # --
+
     # if not glob.glob(input_paths):
     #     print('No files found: ', input_paths)
         
@@ -131,7 +171,12 @@ if __name__ == "__main__":
     parser.add_argument('--skip_border_objects', action='store_true', default=False,  help='When extracting local_regions, ignore segments at depth map boundary.')
     parser.add_argument('--forward_passes', type=int, default=1,  help='Run multiple parallel forward passes to mesh_utils more potential contact points.')
     parser.add_argument('--segmap_id', type=int, default=0,  help='Only return grasps of the given object id')
+    # --
+    parser.add_argument('--object_id', type=str, help='object to move')
+    # --
     parser.add_argument('--arg_configs', nargs="*", type=str, default=[], help='overwrite config parameters')
+
+    
     FLAGS = parser.parse_args()
 
     global_config = config_utils.load_config(FLAGS.ckpt_dir, batch_size=FLAGS.forward_passes, arg_configs=FLAGS.arg_configs)
@@ -141,4 +186,4 @@ if __name__ == "__main__":
 
     inference(global_config, FLAGS.ckpt_dir, FLAGS.np_path if not FLAGS.png_path else FLAGS.png_path, FLAGS.results_path, z_range=eval(str(FLAGS.z_range)),
                 K=FLAGS.K, local_regions=FLAGS.local_regions, filter_grasps=FLAGS.filter_grasps, segmap_id=FLAGS.segmap_id, 
-                forward_passes=FLAGS.forward_passes, skip_border_objects=FLAGS.skip_border_objects)
+                forward_passes=FLAGS.forward_passes, skip_border_objects=FLAGS.skip_border_objects, OBJECT_ID=FLAGS.object_id)
